@@ -5,6 +5,7 @@ import yt_dlp
 from TOKEN import TOKEN, FFMPEG_PATH
 from discord.ext import commands
 import random
+from hangman import HANGMAN
 
 RUSSIAN_NOUNS = open('russian_nouns.txt', encoding='utf-8').read().split('\n')
 values = {'start_hangman': False}
@@ -22,7 +23,7 @@ intents = discord.Intents.all()
 bot = commands.Bot(intents=intents, command_prefix="/")
 
 
-class HangmanReady(discord.ui.View):
+class HangmanReady(discord.ui.View):    # подтверждалка в виселице
     @discord.ui.button(label="Понятно. Приступить к игре", row=0, style=discord.ButtonStyle.green)
     async def ready(self, interaction, button: discord.ui.Button):
         await interaction.response.send_message("Приступаем к игре")
@@ -30,7 +31,7 @@ class HangmanReady(discord.ui.View):
         self.stop()
 
 
-class MyView(discord.ui.View):
+class MyView(discord.ui.View):  # кнопки к animeguesser'у
 
     @discord.ui.button(label="Opening 1", row=0, style=discord.ButtonStyle.secondary, emoji='1️⃣')
     async def first_button_callback(self, interaction, choice_opening):
@@ -39,6 +40,7 @@ class MyView(discord.ui.View):
 
     @discord.ui.button(label="Opening 2", row=0, style=discord.ButtonStyle.secondary, emoji='2️⃣')
     async def second_button_callback(self, interaction, choice_opening):
+        discord.ui.button(label="Opening 2", row=0, style=discord.ButtonStyle.primary, emoji='2️⃣')
         await interaction.response.send_message("Нет")
 
     @discord.ui.button(label="Opening 3", row=1, style=discord.ButtonStyle.secondary, emoji='3️⃣')
@@ -50,7 +52,7 @@ class MyView(discord.ui.View):
         await interaction.response.send_message("бз бз бз.... я пчела")
 
 
-class BulletCountChoose(discord.ui.View):
+class BulletCountChoose(discord.ui.View):   # кнопки для выбора пуль
     @discord.ui.button(label="1 bullet", custom_id="1", row=0, style=discord.ButtonStyle.secondary)
     async def first_button_callback(self, interaction, button: discord.ui.Button):
         await interaction.response.send_message("Выбран режим с 1 пулей")
@@ -70,7 +72,7 @@ class BulletCountChoose(discord.ui.View):
         self.stop()
 
 
-class PreshootView(discord.ui.View):
+class PreshootView(discord.ui.View):    # кнопка для выстрела
     def __init__(self):
         super().__init__(timeout=20.0)
         self.choice = None
@@ -82,9 +84,9 @@ class PreshootView(discord.ui.View):
         self.stop()
 
 
-class ContinueRussianRoulette(discord.ui.View):
+class ContinueRussianRoulette(discord.ui.View):     # кнопки для продолжения/стопа игры в рулетку
     def __init__(self):
-        super().__init__(timeout=30.0)
+        super().__init__(timeout=15.0)
         self.choice = None
 
     @discord.ui.button(label="Продолжить", row=0, style=discord.ButtonStyle.danger)
@@ -100,7 +102,7 @@ class ContinueRussianRoulette(discord.ui.View):
         self.stop()
 
 
-class StartHangman(discord.ui.View):
+class StartHangman(discord.ui.View): #кнопки для старта виселицы
     def __init__(self):
         super().__init__(timeout=30.0)
         values['start_hangman'] = False
@@ -131,14 +133,16 @@ class StartHangman(discord.ui.View):
 
 @bot.tree.command(name="animeguesser", description="КЕФИР")
 async def test(interaction: discord.Interaction):
-    await interaction.response.send_message('Выбирай опенинг или будешь смотреть Boku no Pico ДЕСЯЦ ЧАСОВ!,!!',
-                                            view=MyView())
+    await interaction.response.send_message('Выбирай опенинг',
+                                            view=MyView())  # вызываем кнопки
+
     search = "https://youtu.be/t-3VRjLF7vI?si=TpFJtKtD4N5oLKlw"  # <- сылка на ютуб видео
 
     if not interaction.user.voice:
         await interaction.channel.send("Вы не в войсе")
+
     voice = await interaction.user.voice.channel.connect()
-    await interaction.channel.send("Fine")
+    await interaction.channel.send("Fine")  # подтверждение, что бот зашел в войс
 
     info = yt_dlp.YoutubeDL(YDL_OPTIONS).extract_info(search, download=False)
     url, title = info["url"], info["title"]  # url = аудио файл, title = название видео в ютубе
@@ -156,34 +160,40 @@ async def test(interaction: discord.Interaction):
 
 @bot.tree.command(name="russian_roulette", description="Традиционная русская рулетка")
 async def russian_roulette(interaction: discord.Interaction):
-    bulletin_choose = BulletCountChoose()
-    pull_the_trigger = PreshootView()
-    continue_opt = ContinueRussianRoulette()
-    await interaction.response.send_message('Выбери количество пуль для игры:',
-                                            view=bulletin_choose)
-    await bulletin_choose.wait()
+    bulletin_choose = BulletCountChoose()   # кнопки для выбора пуль
+    pull_the_trigger = PreshootView()   # кнопка для выстрела
 
+    await interaction.response.send_message('Выбери количество пуль для игры:',
+                                            view=bulletin_choose)   # кнопки для продолжения/стопа игры в рулетку
+    await bulletin_choose.wait()
     bulletin_choose.choice = values['bulletin_counter']
+
     if bulletin_choose.choice > 1:
         await interaction.channel.send(f'В БАРАБАНЕ {bulletin_choose.choice} ПУЛИ')
     else:
         await interaction.channel.send(f'В БАРАБАНЕ {bulletin_choose.choice} ПУЛЯ')
     await asyncio.sleep(1)
+
     alive = 1
     bullet_pos = 0
-    bulletoptions = "123456"
+    bulletoptions = "456123"
     dead_bullet_pos = (''.join(random.sample(bulletoptions, len(bulletoptions))))[:bulletin_choose.choice]
-    await interaction.followup.send('Ты уверен что хочешь нажать? Нажми кнопку для выстрела:',
-                                    view=pull_the_trigger)
-    await pull_the_trigger.wait()
+    # перемешка пуль
+
     while alive:
         bullet_pos += 1
-        if pull_the_trigger.choice:
+        continue_opt = ContinueRussianRoulette()
+        await interaction.followup.send('Ты уверен что хочешь нажать? Нажми кнопку для выстрела:',
+                                        view=continue_opt)
+        await continue_opt.wait()
+        if continue_opt.choice:
+            # отсчёт и выстрел
             await interaction.channel.send('окак')
-            await asyncio.sleep(3)
+            await asyncio.sleep(1.4)
             for sec in range(3, 0, -1):
                 await interaction.channel.send(str(sec))
                 await asyncio.sleep(1)
+
             if str(bullet_pos) in dead_bullet_pos:
                 await interaction.channel.send(f'Вы получили пулю в лоб и проиграли.'
                                                f'\n Ваша пуля была: {bullet_pos} '
@@ -191,32 +201,25 @@ async def russian_roulette(interaction: discord.Interaction):
                 alive = 0
 
             else:
-                await interaction.followup.send('Ты уверен что хочешь нажать? Нажми кнопку для выстрела:',
-                                                view=continue_opt)
-                await continue_opt.wait()
-                if continue_opt.choice:
-                    pass
+                # если остался жив
+                if continue_opt.choice is True:
+                    continue
                 elif continue_opt.choice is False:
-                    await interaction.channel.send("Игрок вышел из игры живым"
+                    await interaction.channel.send(f'Игрок вышел из игры живым. Ты сделал правильный выбор. '
+                                                   f'Не стоит стрелять в себя. Цени свою жизнь.'
                                                    f'\n Ваша последняя пуля была: {bullet_pos}'
-                                                   f'\n Проигрышные позиции были: {dead_bullet_pos.split()}')
-                    alive = 0
-                else:
-                    await interaction.channel.send(f"Игрок трусливо убежал от игры..."
-                                                   f"\n Ваша последняя пуля была: {bullet_pos}"
-                                                   f"\n Проигрышные позиции были: {dead_bullet_pos.split()}")
+                                                   f'\n Проигрышные позиции были: {list(dead_bullet_pos)}')
                     alive = 0
         else:
-            await interaction.channel.send("Игрок трусливо убежал от игры...")
+            await interaction.channel.send("Игрок вышел из игры досрочно. Ты сделал правильный выбор. "
+                                           "Не стоит стрелять в себя. Цени свою жизнь.")
             alive = 0
-    print('Игра закончена')
 
 
 @bot.tree.command(name="hangman", description="Игра в виселицу")
 async def hangman(interaction: discord.Interaction):
     def check(message):
-        return message.author == interaction.user
-
+        return message.author == interaction.user   # проверка, чье сообщение
     hangman_config = StartHangman()
     await interaction.response.send_message('Вы выбрали игру в виселицу, нажмите... '
                                             '\n Правила - получить список правил игры'
@@ -224,7 +227,8 @@ async def hangman(interaction: discord.Interaction):
     await hangman_config.wait()
     if values['start_hangman'] is True:
         await interaction.followup.send('Ждем, пока бот выберет слово')
-        answer_word = random.choice(RUSSIAN_NOUNS)
+        answer_word = random.choice(RUSSIAN_NOUNS)   # генерируем сущ
+
         while '-' in answer_word or ' ' in answer_word:
             answer_word = random.choice(RUSSIAN_NOUNS)
         await asyncio.sleep(3)
@@ -234,22 +238,25 @@ async def hangman(interaction: discord.Interaction):
         attempt = 0
         used_letters = []
         while error_counter != 6:
+            # пишет инфу
             if attempt == 0:
                 await interaction.channel.send(f'Ваше слово: {secret_word}\nИспользованных букв нет')
 
             if attempt > 0:
                 await interaction.channel.send(f'Ваше слово: {secret_word}\nИспользованных буквы: {used_letters}'
                                                f' Число ошибок {error_counter}')
-            if secret_word.count('-') == 0:
+
+            if secret_word.count('-') == 0:     # завершить когда слово отгадано
                 break
 
             await interaction.channel.send('Введите вашу букву')
 
             try:
-                letter = (await bot.wait_for('message', check=check, timeout=120.0)).content
+                # Проверка на корректность буквы
+                letter = ((await bot.wait_for('message', check=check, timeout=120.0)).content).lower()
                 await interaction.channel.send(f"Вы написали: {letter}")
 
-                if (len(str(letter)) == 1 and str(letter).lower() in 'йцукенгшщзхъфывапролджэячсмитьбю'
+                if (len(str(letter)) == 1 and str(letter) in 'йцукенгшщзхъфывапролджэячсмитьбю'
                         and not str(letter).lower() in used_letters):
                     exchance_counter = 0
                     for i in range(len(secret_word)):
@@ -272,7 +279,9 @@ async def hangman(interaction: discord.Interaction):
                 await interaction.channel.send("Время вышло!")
                 error_counter = 6
                 await asyncio.sleep(1)
+            await interaction.channel.send(HANGMAN[str(error_counter)])
 
+        # умер или жив игрок
         if error_counter == 6:
             await interaction.channel.send(f"Вы проиграли и были повешены, загаданное слово было {answer_word}")
         else:
