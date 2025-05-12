@@ -4,13 +4,15 @@ import logging
 import yt_dlp
 from TOKEN import TOKEN, FFMPEG_PATH
 from discord.ext import commands
+from random import *
 import random
 from hangman import HANGMAN
 
 RUSSIAN_NOUNS = open('russian_nouns.txt', encoding='utf-8').read().split('\n')
 values = {'start_hangman': False}
+with open("base.txt") as f:
+    BASE = [i.strip("\n").split(" | ") for i in f.readlines()]
 
-FFMPEG_OPTIONS = {"before_options": "-ss 00:00:00", "options": "-vn -t 30"}
 YDL_OPTIONS = {"format": "bestaudio", "noplaylist": True}
 
 logger = logging.getLogger('discord')
@@ -33,23 +35,47 @@ class HangmanReady(discord.ui.View):    # подтверждалка в висе
 
 class MyView(discord.ui.View):  # кнопки к animeguesser'у
 
-    @discord.ui.button(label="Opening 1", row=0, style=discord.ButtonStyle.secondary, emoji='1️⃣')
-    async def first_button_callback(self, interaction, choice_opening):
-        discord.ui.button(label="Opening 1", row=0, style=discord.ButtonStyle.primary, emoji='1️⃣')
-        await interaction.response.send_message("Правильно")
+    def __init__(self, base):
+        super().__init__()
+        self.base = base
+        self.roulette = sample(BASE, 3)
+        if base not in self.roulette:
+            self.roulette[0] = base
+        shuffle(self.roulette)
 
-    @discord.ui.button(label="Opening 2", row=0, style=discord.ButtonStyle.secondary, emoji='2️⃣')
-    async def second_button_callback(self, interaction, choice_opening):
-        discord.ui.button(label="Opening 2", row=0, style=discord.ButtonStyle.primary, emoji='2️⃣')
-        await interaction.response.send_message("Нет")
+        self.button1 = discord.ui.Button(label=f"{self.roulette[0][1]}", row=0, style=discord.ButtonStyle.secondary,
+                                         emoji='1️⃣')
+        self.button2 = discord.ui.Button(label=f"{self.roulette[1][1]}", row=0, style=discord.ButtonStyle.secondary,
+                                         emoji='2️⃣')
+        self.button3 = discord.ui.Button(label=f"{self.roulette[2][1]}", row=0, style=discord.ButtonStyle.secondary,
+                                         emoji='3️⃣')
 
-    @discord.ui.button(label="Opening 3", row=1, style=discord.ButtonStyle.secondary, emoji='3️⃣')
-    async def third_button_callback(self, interaction, choice_opening):
-        await interaction.response.send_message("ГОООООООООООООООЛ")
+        self.button1.callback = self.button1_call
+        self.button2.callback = self.button2_call
+        self.button3.callback = self.button3_call
 
-    @discord.ui.button(label="Opening 4", row=1, style=discord.ButtonStyle.secondary, emoji='4️⃣')
-    async def fourth_button_callback(self, interaction, choice_opening):
-        await interaction.response.send_message("бз бз бз.... я пчела")
+        self.add_item(self.button1)
+        self.add_item(self.button2)
+        self.add_item(self.button3)
+
+    async def button1_call(self, interaction: discord.Interaction):
+        print(1)
+        if self.button1.label == self.base[1]:
+            await interaction.response.send_message("Правильно")
+        else:
+            await interaction.response.send_message("Неверно")
+
+    async def button2_call(self, interaction: discord.Interaction):
+        if self.button2.label == self.base[1]:
+            await interaction.response.send_message("Правильно")
+        else:
+            await interaction.response.send_message("Неверно")
+
+    async def button3_call(self, interaction: discord.Interaction):
+        if self.button3.label == self.base[1]:
+            await interaction.response.send_message("Правильно")
+        else:
+            await interaction.response.send_message("Неверно")
 
 
 class BulletCountChoose(discord.ui.View):   # кнопки для выбора пуль
@@ -131,23 +157,21 @@ class StartHangman(discord.ui.View): #кнопки для старта висе�
         self.stop()
 
 
-@bot.tree.command(name="animeguesser", description="КЕФИР")
+@bot.tree.command(name="animeguesser", description="Угадай аниме опенинг")
 async def test(interaction: discord.Interaction):
-    await interaction.response.send_message('Выбирай опенинг',
-                                            view=MyView())  # вызываем кнопки
-
-    search = "https://youtu.be/t-3VRjLF7vI?si=TpFJtKtD4N5oLKlw"  # <- сылка на ютуб видео
+    random_opening = choice(BASE)
+    search = random_opening[0]  # <- сылка на ютуб видео
+    ffmpeg_options = {"before_options": f"-ss {random_opening[2]}", "options": f"-vn -t {random_opening[3]}"}
 
     if not interaction.user.voice:
         await interaction.channel.send("Вы не в войсе")
-
     voice = await interaction.user.voice.channel.connect()
-    await interaction.channel.send("Fine")  # подтверждение, что бот зашел в войс
+    await interaction.response.send_message("Fine")
 
     info = yt_dlp.YoutubeDL(YDL_OPTIONS).extract_info(search, download=False)
     url, title = info["url"], info["title"]  # url = аудио файл, title = название видео в ютубе
 
-    source = discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS, executable=FFMPEG_PATH)
+    source = discord.FFmpegPCMAudio(url, **ffmpeg_options, executable=FFMPEG_PATH)
     source = discord.PCMVolumeTransformer(source, volume=0.45)
     # ВАЖНО: нужно указывать СВОЙ путь для ffmpeg.exe
 
@@ -156,6 +180,9 @@ async def test(interaction: discord.Interaction):
     while voice.is_playing():
         await asyncio.sleep(0.2)
     await voice.disconnect()
+
+    await interaction.channel.send('Выбирай опенинг или будешь смотреть Boku no Pico ДЕСЯЦ ЧАСОВ!,!!',
+                                            view=MyView(random_opening))
 
 
 @bot.tree.command(name="russian_roulette", description="Традиционная русская рулетка")
